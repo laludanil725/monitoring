@@ -1,0 +1,226 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.peternakclouds.com`)"
+        #- "traefik.http.routers.prometheus.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.prometheus.middlewares=https-redirect"
+
+      - "traefik.http.routers.prometheus-secure.tls=true"
+      - "traefik.http.routers.prometheus-secure.entrypoints=websecure"
+      - "traefik.http.routers.prometheus-secure.rule=Host(`prometheus.peternakclouds.com`)"
+      - "traefik.http.routers.prometheus-secure.service=prometheus"
+        #- "traefik.http.routers.prometheus-secure.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.compresstraefik.compress=true"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    networks:
+      - monitoring
+      - backend
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - ./alertmanager.yml:/config
+      - alertmanager-data:/data/alertmanager
+    command: --config.file=/config/alertmanager.yml --cluster.advertise-address=0.0.0.0:9093
+    ports:
+      - "9093:9093"
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.alertmanager.entrypoints=web"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.peternakclouds.com`)"
+        #- "traefik.http.routers.alertmanager.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.alertmanager.middlewares=https-redirect"
+
+      - "traefik.http.routers.alertmanager-secure.tls=true"
+      - "traefik.http.routers.alertmanager-secure.entrypoints=websecure"
+      - "traefik.http.routers.alertmanager-secure.rule=Host(`alertmanager.peternakclouds.com`)"
+      - "traefik.http.routers.alertmanager-secure.service=alertmanager"
+        #- "traefik.http.routers.alertmanager-secure.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.compresstraefik.compress=true"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+    networks:
+      - monitoring
+      - backend
+
+  discords-webhook:
+    image: benjojo/alertmanager-discord
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    env_file:
+      - discord.env
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - grafana-data:/var/lib/grafana
+    env_file:
+      - grafana.env
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana.rule=Host(`monitoring.peternakclouds.com`)"
+        #- "traefik.http.routers.grafana.middlewares=compresstraefik"
+
+        #- "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+        #- "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+        #- "traefik.http.routers.grafana.middlewares=https-redirect"
+
+      - "traefik.http.routers.grafana-secure.tls=true"
+      - "traefik.http.routers.grafana-secure.entrypoints=websecure"
+      - "traefik.http.routers.grafana-secure.rule=Host(`monitoring.peternakclouds.com`)"
+      - "traefik.http.routers.grafana-secure.service=grafana"
+        #- "traefik.http.routers.grafana-secure.middlewares=compresstraefik"
+
+        #- "traefik.http.middlewares.compresstraefik.compress=true"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    networks:
+      - monitoring
+      - backend
+
+  loki:
+    image: grafana/loki:latest
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+          #labels:
+          #- "traefik.enable=true"
+
+          #- "traefik.http.routers.grafana.entrypoints=web"
+          #- "traefik.http.routers.grafana.rule=Host(`monitoring.peternakclouds.com`)"
+        #- "traefik.http.routers.grafana.middlewares=compresstraefik"
+
+        #- "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+        #- "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+        #- "traefik.http.routers.grafana.middlewares=https-redirect"
+
+          #- "traefik.http.routers.grafana-secure.tls=true"
+          #- "traefik.http.routers.grafana-secure.entrypoints=websecure"
+          #- "traefik.http.routers.grafana-secure.rule=Host(`monitoring.peternakclouds.com`)"
+          #- "traefik.http.routers.grafana-secure.service=grafana"
+        #- "traefik.http.routers.grafana-secure.middlewares=compresstraefik"
+
+        #- "traefik.http.middlewares.compresstraefik.compress=true"
+        #- "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    networks:
+      - monitoring
+      - backend
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    ports:
+      - 8081:8080
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.cadvisor.entrypoints=web"
+      - "traefik.http.routers.cadvisor.rule=Host(`cadvisor.peternakclouds.com`)"
+        #- "traefik.http.routers.cadvisor.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.ssl-header.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.cadvisor.middlewares=https-redirect"
+
+      - "traefik.http.routers.cadvisor-secure.tls=true"
+      - "traefik.http.routers.cadvisor-secure.entrypoints=websecure"
+      - "traefik.http.routers.cadvisor-secure.rule=Host(`cadvisor.peternakclouds.com`)"
+      - "traefik.http.routers.cadvisor-secure.service=cadvisor"
+        #- "traefik.http.routers.cadvisor-secure.middlewares=compresstraefik"
+
+      - "traefik.http.middlewares.compresstraefik.compress=true"
+      - "traefik.http.services.cadvisor.loadbalancer.server.port=8080"
+    networks:
+      - monitoring
+      - backend
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+      mode: global
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    external: true
+  backend:
+    external: true
+
+volumes:
+  grafana-data:
+  loki_data:
+  alertmanager-data:
