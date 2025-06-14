@@ -1,0 +1,38 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik:v3.2.3
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    networks:
+      - backend
+      - frontend
+    ports:
+      - 80:80
+      - 443:443
+    entrypoint: ["/entrypoint.sh"]
+    volumes:
+      - ./letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./secrets:/secrets:ro
+      - ./entrypoint.sh:/entrypoint.sh:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik-secure.rule=Host(`traefik.peternakclouds.com`)
+      - traefik.http.routers.traefik-secure.entrypoints=websecure
+      - traefik.http.routers.traefik-secure.service=api@internal
+      - traefik.http.routers.traefik-secure.tls.certresolver=le
+      - traefik.http.routers.traefik-secure.middlewares=traefik-auth
+      - traefik.http.middlewares.traefik-auth.basicauth.users=peternakclouds:$$2y$$05$$uRIGce934NBgoIlXlU4sS.ZJPKHPwXdPhTcDtXVI3rg6hR0wUR0kq
+
+networks:
+  backend:
+    external: true
+  frontend:
+    external: true
+
+volumes:
+  letsencrypt:
+    name: letsencrypt
