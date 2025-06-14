@@ -1,0 +1,50 @@
+# traefik.yml
+
+# Global Configuration
+log:
+  level: DEBUG
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+
+serversTransport:
+  insecureSkipVerify: true
+
+# Let's Encrypt Configuration
+certificatesResolvers:
+  le:
+    acme:
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+      email: peternakclouds@gmail.com
+      storage: ./letsencrypt/acme.json
+
+# Entry Points Configuration
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+# Security options
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+
+
+# Cloudflare DNS Challenge secrets (cloudflare-token and cloudflare-email)
+secrets:
+  cloudflare-token:
+    file: "./secrets/cloudflare-token.secret"
+  cloudflare-email:
+    file: "./secrets/cloudflare-email.secret"
